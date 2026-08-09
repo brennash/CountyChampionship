@@ -12,6 +12,10 @@ export const MAX_TURNS = 220;
 const POWER_SCALE = MAX_STACK / 30;
 export const START_ARMY = Math.round(10 * POWER_SCALE);
 export const MAX_MOVES_PER_TURN = 3;
+export const REINFORCEMENT_GAIN = 9;
+export const CAPITAL_REINFORCEMENT_GAIN = 16;
+
+const CAPITAL_IDS = new Set(PLAYERS.map((p) => p.capital));
 
 function rand(a: number, b: number): number {
   return a + Math.floor(Math.random() * (b - a + 1));
@@ -249,7 +253,7 @@ export function applyReinforcements(state: GameState): void {
   ALL_IDS.forEach((id) => {
     const pid = state.owner[id];
     if (pid === "neutral") return;
-    const gain = scalePower(1 + Math.floor(COUNTIES[id].pop / 2));
+    const gain = CAPITAL_IDS.has(id) ? CAPITAL_REINFORCEMENT_GAIN : REINFORCEMENT_GAIN;
     state.army[id] = Math.min(MAX_STACK, state.army[id] + gain);
   });
 }
