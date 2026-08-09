@@ -418,7 +418,25 @@
   }
 
   @media (max-width: 880px){
-    .layout{ flex-direction:column; }
-    .sidebar{ width:auto; border-left:none; border-top:1px solid var(--panel-border); }
-    svg#map{ width:min(92vw, 640px); }
+    /* Map+sidebar stacked in one viewport would leave almost no room for either,
+       so on narrow screens the page scrolls normally instead of locking to 100vh —
+       the title bar (with End Turn/New Game) stays sticky so it's always reachable. */
+    html, body{ overflow-y:auto; height:auto; min-height:100%; }
+    body{ height:auto; min-height:100vh; min-height:100dvh; }
+    #root{ height:auto; min-height:100%; }
+    .titlebar{ position:sticky; top:0; z-index:10; }
+    .layout{ flex-direction:column; flex:none; min-height:0; }
+    .map-wrap{ flex:none; overflow:visible; }
+    .sidebar{ width:auto; flex:none; border-left:none; border-top:1px solid var(--panel-border); overflow-y:visible; }
+    .log-section{ flex:none; min-height:0; }
+    .log-list{ max-height:240px; }
+    svg#map{ width:min(calc(100vw - 76px), 640px); }
+  }
+
+  @media (max-width: 560px){
+    .titlebar{ flex-direction:column; align-items:stretch; gap:10px; }
+    .brand{ flex-wrap:wrap; }
+    .brand h1{ font-size:1.15rem; }
+    .turn-badge{ align-self:flex-start; }
+    .toolbar button{ flex:1; }
   }

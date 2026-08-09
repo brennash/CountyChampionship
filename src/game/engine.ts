@@ -203,7 +203,7 @@ export function checkGameEnd(state: GameState): boolean {
   const active = state.players.filter(isActivePlayer);
   if (active.length === 1 && active[0].isHuman) {
     state.gameOver = true;
-    showModal(state, "Victory!", `Every rival province has fallen. Leinster reigns over all Éire after ${state.turn} turns.`, "victory");
+    showModal(state, "Victory!", `Every rival province has fallen. Leinster reigns over all Ireland after ${state.turn} turns.`, "victory");
     return true;
   }
   if (countyCount(state, "human") === 32) {
