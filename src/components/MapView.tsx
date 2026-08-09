@@ -10,6 +10,8 @@ interface Props {
 }
 
 export function MapView({ state, onSelect }: Props) {
+  const currentPlayer = state.players[state.currentPlayerIndex];
+
   return (
     <svg id="map" viewBox="100 60 1270 1670" xmlns="http://www.w3.org/2000/svg">
       <g>
@@ -27,9 +29,10 @@ export function MapView({ state, onSelect }: Props) {
           ) {
             classes.push("targetable");
           }
-          if (ownerId === "human" && (state.usedSources.has(id) || state.usedDestinations.has(id))) {
+          if (ownerId === currentPlayer.id && (state.usedSources.has(id) || state.usedDestinations.has(id))) {
             classes.push("locked");
           }
+          if (state.blinkingCounty === id) classes.push("ai-blink");
 
           return (
             <g key={id} className={classes.join(" ")} onClick={() => onSelect(id)}>

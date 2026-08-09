@@ -9,9 +9,18 @@ interface Props {
 }
 
 export function SelectionPanel({ state, onCancel }: Props) {
+  const cp = state.players[state.currentPlayerIndex];
   let body: ReactNode;
+
   if (state.gameOver) {
     body = "The campaign has ended.";
+  } else if (!cp.isHuman) {
+    body = (
+      <>
+        {cp.name} is marching.
+        <span className="hint">Watch the map — each move is highlighted before it lands.</span>
+      </>
+    );
   } else if (state.selected) {
     const c = COUNTIES[state.selected];
     body = (
@@ -35,7 +44,7 @@ export function SelectionPanel({ state, onCancel }: Props) {
 
   return (
     <div className="sidebar-section">
-      <h2>Your Move</h2>
+      <h2>{state.gameOver ? "Campaign Over" : `${cp.name}'s Move`}</h2>
       <div className="selection-box">
         {!state.gameOver && (
           <div className="moves-remaining">
@@ -45,7 +54,7 @@ export function SelectionPanel({ state, onCancel }: Props) {
         )}
         {body}
       </div>
-      {state.selected && (
+      {cp.isHuman && state.selected && (
         <div className="action-row">
           <button onClick={onCancel}>Cancel</button>
         </div>

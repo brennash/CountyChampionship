@@ -1,6 +1,6 @@
 import { ALL_IDS, COUNTIES } from "../data/countyData";
 import { PLAYERS } from "../data/players";
-import type { OwnerId } from "../data/players";
+import type { OwnerId, PlayerId } from "../data/players";
 import { DIFFICULTY_PROFILES } from "./difficulty";
 import type { Difficulty } from "./difficulty";
 import type { GameState, LogEntry, ModalInfo, MoveResult, RuntimePlayer } from "./types";
@@ -14,7 +14,7 @@ function rand(a: number, b: number): number {
   return a + Math.floor(Math.random() * (b - a + 1));
 }
 
-export function createInitialState(difficulty: Difficulty = "hard"): GameState {
+export function createInitialState(difficulty: Difficulty = "hard", roles?: Record<PlayerId, boolean>): GameState {
   const owner: Record<string, OwnerId> = {};
   const army: Record<string, number> = {};
   ALL_IDS.forEach((id) => {
@@ -26,21 +26,32 @@ export function createInitialState(difficulty: Difficulty = "hard"): GameState {
     army[p.capital] = START_ARMY;
   });
 
+  const players: RuntimePlayer[] = PLAYERS.map((p) => ({
+    id: p.id,
+    name: p.name,
+    isHuman: roles ? roles[p.id] : p.isHuman,
+    capital: p.capital,
+    eliminated: false,
+  }));
+
   const state: GameState = {
     turn: 1,
     difficulty,
     owner,
     army,
-    players: PLAYERS.map((p): RuntimePlayer => ({ ...p, eliminated: false })),
+    players,
+    currentPlayerIndex: 0,
     selected: null,
     movesUsed: 0,
     usedSources: new Set(),
     usedDestinations: new Set(),
+    blinkingCounty: null,
+    pendingAiMove: null,
     log: [],
     gameOver: false,
     modal: null,
   };
-  pushLog(state, "Turn 1 begins. Four provinces rise to claim the island.", "turn-marker");
+  pushLog(state, `Turn 1 begins. Four provinces rise to claim the island.`, "turn-marker");
   return state;
 }
 
@@ -51,6 +62,10 @@ export function pushLog(state: GameState, msg: string, cls?: string): void {
 
 export function getPlayer(state: GameState, id: OwnerId): RuntimePlayer | undefined {
   return state.players.find((p) => p.id === id);
+}
+
+export function currentPlayer(state: GameState): RuntimePlayer {
+  return state.players[state.currentPlayerIndex];
 }
 
 export function isActivePlayer(p: RuntimePlayer): boolean {
@@ -67,6 +82,16 @@ export function armyTotal(state: GameState, pid: OwnerId): number {
 
 function isFrontline(state: GameState, id: string, pid: OwnerId): boolean {
   return COUNTIES[id].neighbors.some((n) => state.owner[n] !== pid);
+}
+
+/** Whether `pid` still has any legal source county to march from this phase. */
+function hasValidMove(state: GameState, pid: OwnerId): boolean {
+  return ALL_IDS.some((id) => {
+    if (state.owner[id] !== pid) return false;
+    if (state.army[id] < 1) return false;
+    if (state.usedSources.has(id) || state.usedDestinations.has(id)) return false;
+    return COUNTIES[id].neighbors.length > 0;
+  });
 }
 
 // ---------- Combat ----------
@@ -120,64 +145,88 @@ interface CandidateMove {
   score: number;
 }
 
-export function aiTakeTurn(state: GameState, p: RuntimePlayer): void {
+/** Picks the AI's next single move given the current board, or null if it has nothing worth doing. */
+function planAiMove(state: GameState, p: RuntimePlayer): CandidateMove | null {
   const profile = DIFFICULTY_PROFILES[state.difficulty];
   const capitals = new Set(state.players.map((pl) => pl.capital));
-  const usedSources = new Set<string>();
-  const usedDestinations = new Set<string>();
-  let movesMade = 0;
+  const candidates: CandidateMove[] = [];
+  let best: CandidateMove | null = null;
 
-  for (let move = 0; move < MAX_MOVES_PER_TURN; move++) {
-    // A less skilled AI can lose interest partway through its turn, even with good moves left.
-    if (move > 0 && Math.random() < profile.passChance) break;
-
-    const candidates: CandidateMove[] = [];
-    let best: CandidateMove | null = null;
-
-    ALL_IDS.forEach((id) => {
-      if (state.owner[id] !== p.id) return;
-      if (usedSources.has(id) || usedDestinations.has(id)) return;
-      const from = state.army[id];
-      if (from < 1) return;
-      COUNTIES[id].neighbors.forEach((nid) => {
-        const targetOwner = state.owner[nid];
-        let score: number;
-        if (targetOwner === p.id) {
-          const front = isFrontline(state, nid, p.id);
-          score = front ? 4 + state.army[nid] * 0.08 : -5;
+  ALL_IDS.forEach((id) => {
+    if (state.owner[id] !== p.id) return;
+    if (state.usedSources.has(id) || state.usedDestinations.has(id)) return;
+    const from = state.army[id];
+    if (from < 1) return;
+    COUNTIES[id].neighbors.forEach((nid) => {
+      const targetOwner = state.owner[nid];
+      let score: number;
+      if (targetOwner === p.id) {
+        const front = isFrontline(state, nid, p.id);
+        score = front ? 4 + state.army[nid] * 0.08 : -5;
+      } else {
+        const defense = state.army[nid];
+        if (from > defense) {
+          score = 32 - (from - defense) + (targetOwner === "neutral" ? 2 : 0);
+          if (targetOwner !== "neutral" && capitals.has(nid)) score += profile.capitalBonus;
         } else {
-          const defense = state.army[nid];
-          if (from > defense) {
-            score = 32 - (from - defense) + (targetOwner === "neutral" ? 2 : 0);
-            if (targetOwner !== "neutral" && capitals.has(nid)) score += profile.capitalBonus;
-          } else {
-            score = -200;
-          }
+          score = -200;
         }
-        if (score > -1) candidates.push({ from: id, to: nid, score });
-        if (!best || score > best.score) best = { from: id, to: nid, score };
-      });
+      }
+      if (score > -1) candidates.push({ from: id, to: nid, score });
+      if (!best || score > best.score) best = { from: id, to: nid, score };
     });
+  });
 
-    if (best === null) break;
-    const bestMove: CandidateMove = best;
-    if (bestMove.score <= -1) break;
+  if (best === null) return null;
+  const bestMove: CandidateMove = best;
+  if (bestMove.score <= -1) return null;
 
-    // A less skilled AI sometimes overlooks the best move and takes a merely reasonable one instead.
-    const chosen =
-      candidates.length > 1 && Math.random() < profile.mistakeChance
-        ? candidates[rand(0, candidates.length - 1)]
-        : bestMove;
+  // A less skilled AI sometimes overlooks the best move and takes a merely reasonable one instead.
+  if (candidates.length > 1 && Math.random() < profile.mistakeChance) {
+    return candidates[rand(0, candidates.length - 1)];
+  }
+  return bestMove;
+}
 
-    executeMove(state, chosen.from, chosen.to, p.id);
-    usedSources.add(chosen.from);
-    usedDestinations.add(chosen.to);
-    movesMade++;
+/**
+ * Chooses the AI's next move (if any) and parks it as a pending move so the UI can blink the
+ * target county before it resolves. Ends the AI's phase when it has nothing left to do.
+ */
+export function aiPlanStep(state: GameState): void {
+  if (state.gameOver) return;
+  const p = currentPlayer(state);
+  if (p.isHuman) return;
+
+  const profile = DIFFICULTY_PROFILES[state.difficulty];
+  // A less skilled AI can lose interest partway through its turn, even with good moves left.
+  const losesInterest = state.movesUsed > 0 && Math.random() < profile.passChance;
+  const move = losesInterest || state.movesUsed >= MAX_MOVES_PER_TURN ? null : planAiMove(state, p);
+
+  if (!move) {
+    if (state.movesUsed === 0) pushLog(state, `${p.name} holds its lines this turn.`);
+    advanceToNextPlayer(state);
+    return;
   }
 
-  if (movesMade === 0) {
-    pushLog(state, `${p.name} holds its lines this turn.`);
-  }
+  state.pendingAiMove = { from: move.from, to: move.to };
+  state.blinkingCounty = move.to;
+}
+
+/** Resolves the AI's pending move (called after the blink animation finishes). */
+export function aiResolveStep(state: GameState): void {
+  if (state.gameOver) return;
+  const p = currentPlayer(state);
+  if (p.isHuman || !state.pendingAiMove) return;
+
+  const { from, to } = state.pendingAiMove;
+  executeMove(state, from, to, p.id);
+  state.usedSources.add(from);
+  state.usedDestinations.add(to);
+  state.movesUsed += 1;
+  state.pendingAiMove = null;
+  state.blinkingCounty = null;
+
+  checkGameEnd(state);
 }
 
 export function applyReinforcements(state: GameState): void {
@@ -194,78 +243,93 @@ function showModal(state: GameState, title: string, text: string, kind: ModalInf
 }
 
 export function checkGameEnd(state: GameState): boolean {
-  const human = getPlayer(state, "human")!;
-  if (human.eliminated) {
-    state.gameOver = true;
-    showModal(state, "Defeat", `Leinster has fallen. The island passes to other hands after ${state.turn} turns.`, "danger");
-    return true;
-  }
   const active = state.players.filter(isActivePlayer);
-  if (active.length === 1 && active[0].isHuman) {
+
+  if (active.length <= 1) {
     state.gameOver = true;
-    showModal(state, "Victory!", `Every rival province has fallen. Leinster reigns over all Ireland after ${state.turn} turns.`, "victory");
+    const winner = active[0];
+    if (winner) {
+      showModal(
+        state,
+        "Victory!",
+        `Every rival province has fallen. ${winner.name} reigns over all Ireland after ${state.turn} turns.`,
+        winner.isHuman ? "victory" : "danger"
+      );
+    } else {
+      showModal(state, "Campaign Ends", `No province survives the campaign after ${state.turn} turns.`, "danger");
+    }
     return true;
   }
-  if (countyCount(state, "human") === 32) {
-    state.gameOver = true;
-    showModal(state, "Victory!", `All 32 counties fly the Leinster banner. The island is united after ${state.turn} turns.`, "victory");
-    return true;
-  }
+
   if (state.turn >= MAX_TURNS) {
     state.gameOver = true;
     const ranked = state.players.slice().sort((a, b) => countyCount(state, b.id) - countyCount(state, a.id));
     const leader = ranked[0];
-    if (leader.isHuman) {
-      showModal(
-        state,
-        "Victory by Dominance",
-        `The campaign clock runs out. Leinster holds the most counties (${countyCount(state, "human")}) and claims the age.`,
-        "victory"
-      );
-    } else {
-      showModal(
-        state,
-        "Campaign Ends",
-        `The campaign clock runs out. ${leader.name} holds the most counties (${countyCount(state, leader.id)}). Leinster is not the strongest power.`,
-        "danger"
-      );
-    }
+    showModal(
+      state,
+      leader.isHuman ? "Victory by Dominance" : "Campaign Ends",
+      `The campaign clock runs out. ${leader.name} holds the most counties (${countyCount(state, leader.id)}).`,
+      leader.isHuman ? "victory" : "danger"
+    );
     return true;
   }
+
   return false;
 }
 
 // ---------- Turn flow ----------
-export function advanceTurn(state: GameState): void {
+function beginPlayerPhase(state: GameState): void {
   state.selected = null;
-
-  state.players.forEach((p) => {
-    if (!p.isHuman && isActivePlayer(p)) aiTakeTurn(state, p);
-  });
-  if (checkGameEnd(state)) return;
-
-  applyReinforcements(state);
-  state.turn += 1;
   state.movesUsed = 0;
   state.usedSources = new Set();
   state.usedDestinations = new Set();
-  pushLog(state, `Turn ${state.turn} begins.`, "turn-marker");
+  state.blinkingCounty = null;
+  state.pendingAiMove = null;
+}
+
+/** Moves the turn on to the next non-eliminated player, rolling the campaign turn over once everyone has gone. */
+export function advanceToNextPlayer(state: GameState): void {
+  if (state.gameOver) return;
+  const n = state.players.length;
+  const startIdx = state.currentPlayerIndex;
+  let idx = startIdx;
+  let steps = 0;
+  do {
+    idx = (idx + 1) % n;
+    steps += 1;
+  } while (state.players[idx].eliminated && steps <= n);
+
+  if (state.players[idx].eliminated) return; // no active players left; checkGameEnd should already have caught this
+
+  const wrapped = idx <= startIdx;
+  state.currentPlayerIndex = idx;
+  beginPlayerPhase(state);
+
+  if (wrapped) {
+    applyReinforcements(state);
+    state.turn += 1;
+    pushLog(state, `Turn ${state.turn} begins.`, "turn-marker");
+  }
 
   checkGameEnd(state);
 }
 
 export function endTurn(state: GameState): void {
-  if (state.gameOver || state.movesUsed >= MAX_MOVES_PER_TURN) return;
+  if (state.gameOver) return;
+  const p = currentPlayer(state);
+  if (!p.isHuman) return;
   if (state.movesUsed === 0) {
-    pushLog(state, `Leinster holds position this turn.`);
+    pushLog(state, `${p.name} holds position this turn.`);
   } else {
-    pushLog(state, `Leinster ends its turn early, ${state.movesUsed} of ${MAX_MOVES_PER_TURN} moves used.`);
+    pushLog(state, `${p.name} ends its turn early, ${state.movesUsed} of ${MAX_MOVES_PER_TURN} moves used.`);
   }
-  advanceTurn(state);
+  advanceToNextPlayer(state);
 }
 
 export function selectCounty(state: GameState, id: string): void {
-  if (state.gameOver || state.movesUsed >= MAX_MOVES_PER_TURN) return;
+  if (state.gameOver) return;
+  const p = currentPlayer(state);
+  if (!p.isHuman || state.movesUsed >= MAX_MOVES_PER_TURN) return;
   const owner = state.owner[id];
 
   if (state.selected === id) {
@@ -279,19 +343,19 @@ export function selectCounty(state: GameState, id: string): void {
   // this turn it can never become a source.
   if (state.selected && COUNTIES[state.selected].neighbors.includes(id)) {
     const from = state.selected;
-    executeMove(state, from, id, "human");
+    executeMove(state, from, id, p.id);
     state.usedSources.add(from);
     state.usedDestinations.add(id);
     state.movesUsed += 1;
     state.selected = null;
     if (checkGameEnd(state)) return;
-    if (state.movesUsed >= MAX_MOVES_PER_TURN) {
-      advanceTurn(state);
+    if (state.movesUsed >= MAX_MOVES_PER_TURN || !hasValidMove(state, p.id)) {
+      advanceToNextPlayer(state);
     }
     return;
   }
 
-  if (owner === "human") {
+  if (owner === p.id) {
     if (state.army[id] < 1) return;
     if (state.usedSources.has(id) || state.usedDestinations.has(id)) return;
     state.selected = id;

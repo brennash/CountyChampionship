@@ -1,14 +1,17 @@
-import { createInitialState, endTurn, pushLog, selectCounty } from "./engine";
+import { aiPlanStep, aiResolveStep, createInitialState, endTurn, pushLog, selectCounty } from "./engine";
 import { DIFFICULTY_PROFILES } from "./difficulty";
 import type { Difficulty } from "./difficulty";
 import type { GameState } from "./types";
+import type { PlayerId } from "../data/players";
 
 export type GameAction =
   | { type: "SELECT_COUNTY"; id: string }
   | { type: "CANCEL_SELECTION" }
   | { type: "END_TURN" }
-  | { type: "NEW_GAME" }
-  | { type: "SET_DIFFICULTY"; difficulty: Difficulty };
+  | { type: "NEW_GAME"; roles: Record<PlayerId, boolean>; difficulty: Difficulty }
+  | { type: "SET_DIFFICULTY"; difficulty: Difficulty }
+  | { type: "AI_PLAN_MOVE" }
+  | { type: "AI_RESOLVE_MOVE" };
 
 function cloneState(state: GameState): GameState {
   return {
@@ -39,8 +42,18 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       endTurn(draft);
       return draft;
     }
+    case "AI_PLAN_MOVE": {
+      const draft = cloneState(state);
+      aiPlanStep(draft);
+      return draft;
+    }
+    case "AI_RESOLVE_MOVE": {
+      const draft = cloneState(state);
+      aiResolveStep(draft);
+      return draft;
+    }
     case "NEW_GAME":
-      return createInitialState(state.difficulty);
+      return createInitialState(action.difficulty, action.roles);
     case "SET_DIFFICULTY": {
       if (action.difficulty === state.difficulty) return state;
       const draft = cloneState(state);
