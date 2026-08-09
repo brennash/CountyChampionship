@@ -22,7 +22,11 @@ export default function App() {
             <MapView state={state} onSelect={(id) => dispatch({ type: "SELECT_COUNTY", id })} />
           </div>
         </div>
-        <Sidebar state={state} onCancel={() => dispatch({ type: "CANCEL_SELECTION" })} />
+        <Sidebar
+          state={state}
+          onCancel={() => dispatch({ type: "CANCEL_SELECTION" })}
+          onChangeDifficulty={(difficulty) => dispatch({ type: "SET_DIFFICULTY", difficulty })}
+        />
       </div>
       {state.modal && <GameOverModal modal={state.modal} onNewGame={() => dispatch({ type: "NEW_GAME" })} />}
     </>

@@ -1,4 +1,5 @@
 import type { OwnerId, PlayerId } from "../data/players";
+import type { Difficulty } from "./difficulty";
 
 export interface RuntimePlayer {
   id: PlayerId;
@@ -22,6 +23,7 @@ export interface ModalInfo {
 
 export interface GameState {
   turn: number;
+  difficulty: Difficulty;
   owner: Record<string, OwnerId>;
   army: Record<string, number>;
   players: RuntimePlayer[];

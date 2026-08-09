@@ -27,13 +27,22 @@
     padding:0;
     font-family: -apple-system, "Avenir Next", "Segoe UI", Roboto, sans-serif;
     height:100%;
+    overflow-x:auto;
+    overflow-y:hidden;
   }
   body{
     background:
       radial-gradient(ellipse at 20% -10%, rgba(217,164,65,0.10), transparent 55%),
       radial-gradient(ellipse at 100% 100%, rgba(63,143,95,0.08), transparent 50%),
       var(--ground);
-    min-height:100vh;
+    height:100vh;
+    height:100dvh;
+    display:flex;
+    flex-direction:column;
+  }
+  #root{
+    height:100%;
+    min-height:0;
     display:flex;
     flex-direction:column;
   }
@@ -44,7 +53,7 @@
     gap:16px;
     padding:14px 22px;
     border-bottom:1px solid var(--panel-border);
-    background:linear-gradient(180deg, rgba(217,164,65,0.06), transparent);
+    background:linear-gradient(180deg, rgba(217,164,65,0.06), transparent), var(--ground);
     flex-wrap:wrap;
   }
   .brand{
@@ -87,6 +96,36 @@
   .toolbar{
     display:flex;
     gap:8px;
+  }
+  .difficulty-select{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    background:var(--panel-2);
+    border:1px solid var(--panel-border);
+    border-radius:999px;
+    padding:4px;
+  }
+  .difficulty-select button{
+    flex:1;
+    font-size:0.72rem;
+    padding:6px 8px;
+    border-radius:999px;
+    border:1px solid transparent;
+    background:transparent;
+    color:var(--ink-dim);
+    text-align:center;
+  }
+  .difficulty-select button:hover:not(.active){
+    background:var(--panel-2);
+    color:var(--ink);
+    border-color:transparent;
+  }
+  .difficulty-select button.active{
+    background:var(--gold);
+    border-color:var(--gold);
+    color:#241a08;
+    font-weight:700;
   }
   button{
     font-family:inherit;
@@ -197,9 +236,11 @@
     display:flex;
     flex-direction:column;
     min-height:0;
+    overflow-y:auto;
   }
   .sidebar-section{
-    padding:16px 18px;
+    flex-shrink:0;
+    padding:12px 18px;
     border-bottom:1px solid var(--panel-border);
   }
   .sidebar-section h2{
@@ -207,16 +248,16 @@
     letter-spacing:0.14em;
     text-transform:uppercase;
     color:var(--ink-faint);
-    margin:0 0 10px 0;
+    margin:0 0 8px 0;
     font-weight:700;
   }
   .player-card{
     display:flex;
     align-items:center;
     gap:10px;
-    padding:8px 10px;
+    padding:7px 10px;
     border-radius:8px;
-    margin-bottom:6px;
+    margin-bottom:5px;
     background:var(--panel-2);
     border:1px solid transparent;
   }
@@ -302,10 +343,10 @@
 
   .log-section{
     flex:1;
-    min-height:0;
+    min-height:150px;
     display:flex;
     flex-direction:column;
-    padding:16px 18px;
+    padding:12px 18px;
   }
   .log-list{
     flex:1;
@@ -334,11 +375,12 @@
   .log-entry.elim{ color:var(--danger); font-weight:600; }
 
   .footer-note{
-    padding:10px 18px 14px;
-    font-size:0.68rem;
+    flex-shrink:0;
+    padding:8px 18px 10px;
+    font-size:0.66rem;
     color:var(--ink-faint);
     border-top:1px solid var(--panel-border);
-    line-height:1.5;
+    line-height:1.42;
   }
 
   .modal-overlay{

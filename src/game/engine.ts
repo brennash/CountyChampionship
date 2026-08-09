@@ -1,6 +1,8 @@
 import { ALL_IDS, COUNTIES } from "../data/countyData";
 import { PLAYERS } from "../data/players";
 import type { OwnerId } from "../data/players";
+import { DIFFICULTY_PROFILES } from "./difficulty";
+import type { Difficulty } from "./difficulty";
 import type { GameState, LogEntry, ModalInfo, MoveResult, RuntimePlayer } from "./types";
 
 export const MAX_STACK = 30;
@@ -12,7 +14,7 @@ function rand(a: number, b: number): number {
   return a + Math.floor(Math.random() * (b - a + 1));
 }
 
-export function createInitialState(): GameState {
+export function createInitialState(difficulty: Difficulty = "hard"): GameState {
   const owner: Record<string, OwnerId> = {};
   const army: Record<string, number> = {};
   ALL_IDS.forEach((id) => {
@@ -26,6 +28,7 @@ export function createInitialState(): GameState {
 
   const state: GameState = {
     turn: 1,
+    difficulty,
     owner,
     army,
     players: PLAYERS.map((p): RuntimePlayer => ({ ...p, eliminated: false })),
@@ -111,15 +114,25 @@ function checkElimination(state: GameState, pid: OwnerId): void {
 }
 
 // ---------- AI ----------
+interface CandidateMove {
+  from: string;
+  to: string;
+  score: number;
+}
+
 export function aiTakeTurn(state: GameState, p: RuntimePlayer): void {
+  const profile = DIFFICULTY_PROFILES[state.difficulty];
   const capitals = new Set(state.players.map((pl) => pl.capital));
   const usedSources = new Set<string>();
   const usedDestinations = new Set<string>();
   let movesMade = 0;
 
   for (let move = 0; move < MAX_MOVES_PER_TURN; move++) {
-    let best: { from: string; to: string } | null = null;
-    let bestScore = -1e9;
+    // A less skilled AI can lose interest partway through its turn, even with good moves left.
+    if (move > 0 && Math.random() < profile.passChance) break;
+
+    const candidates: CandidateMove[] = [];
+    let best: CandidateMove | null = null;
 
     ALL_IDS.forEach((id) => {
       if (state.owner[id] !== p.id) return;
@@ -136,27 +149,30 @@ export function aiTakeTurn(state: GameState, p: RuntimePlayer): void {
           const defense = state.army[nid];
           if (from > defense) {
             score = 32 - (from - defense) + (targetOwner === "neutral" ? 2 : 0);
-            if (targetOwner !== "neutral" && capitals.has(nid)) score += 12;
+            if (targetOwner !== "neutral" && capitals.has(nid)) score += profile.capitalBonus;
           } else {
             score = -200;
           }
         }
-        if (score > bestScore) {
-          bestScore = score;
-          best = { from: id, to: nid };
-        }
+        if (score > -1) candidates.push({ from: id, to: nid, score });
+        if (!best || score > best.score) best = { from: id, to: nid, score };
       });
     });
 
-    if (best && bestScore > -1) {
-      const { from, to } = best as { from: string; to: string };
-      executeMove(state, from, to, p.id);
-      usedSources.add(from);
-      usedDestinations.add(to);
-      movesMade++;
-    } else {
-      break;
-    }
+    if (best === null) break;
+    const bestMove: CandidateMove = best;
+    if (bestMove.score <= -1) break;
+
+    // A less skilled AI sometimes overlooks the best move and takes a merely reasonable one instead.
+    const chosen =
+      candidates.length > 1 && Math.random() < profile.mistakeChance
+        ? candidates[rand(0, candidates.length - 1)]
+        : bestMove;
+
+    executeMove(state, chosen.from, chosen.to, p.id);
+    usedSources.add(chosen.from);
+    usedDestinations.add(chosen.to);
+    movesMade++;
   }
 
   if (movesMade === 0) {

@@ -24,12 +24,7 @@ export function SelectionPanel({ state, onCancel }: Props) {
     body = (
       <>
         Select one of your counties, then click a neighbouring county to march your army into it.
-        <span className="hint">
-          A county can be marched into any number of times, adding to its strength each time — but once it has
-          been a destination, it can never march out as a source this turn. A dimmed county has already played
-          a role and can't be selected as a new source. Your turn ends automatically after {MAX_MOVES_PER_TURN}{" "}
-          moves, or click &quot;End Turn&quot; to stop sooner.
-        </span>
+        <span className="hint">A dimmed county has already played a role this turn and can't be a new source.</span>
       </>
     );
   }
@@ -50,11 +45,11 @@ export function SelectionPanel({ state, onCancel }: Props) {
         )}
         {body}
       </div>
-      <div className="action-row">
-        <button disabled={!state.selected} onClick={onCancel}>
-          Cancel
-        </button>
-      </div>
+      {state.selected && (
+        <div className="action-row">
+          <button onClick={onCancel}>Cancel</button>
+        </div>
+      )}
     </div>
   );
 }
