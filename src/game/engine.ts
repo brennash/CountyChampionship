@@ -14,6 +14,8 @@ export const START_ARMY = Math.round(10 * POWER_SCALE);
 export const MAX_MOVES_PER_TURN = 3;
 export const REINFORCEMENT_GAIN = 9;
 export const CAPITAL_REINFORCEMENT_GAIN = 16;
+export const EXPANSION_COUNTY_THRESHOLD = 4;
+export const EXPANSION_REINFORCEMENT_GAIN = 12;
 
 const CAPITAL_IDS = new Set(PLAYERS.map((p) => p.capital));
 
@@ -253,7 +255,12 @@ export function applyReinforcements(state: GameState): void {
   ALL_IDS.forEach((id) => {
     const pid = state.owner[id];
     if (pid === "neutral") return;
-    const gain = CAPITAL_IDS.has(id) ? CAPITAL_REINFORCEMENT_GAIN : REINFORCEMENT_GAIN;
+    const gain =
+      countyCount(state, pid) >= EXPANSION_COUNTY_THRESHOLD
+        ? EXPANSION_REINFORCEMENT_GAIN
+        : CAPITAL_IDS.has(id)
+          ? CAPITAL_REINFORCEMENT_GAIN
+          : REINFORCEMENT_GAIN;
     state.army[id] = Math.min(MAX_STACK, state.army[id] + gain);
   });
 }
