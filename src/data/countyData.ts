@@ -52,7 +52,7 @@ export const RAW_COUNTIES: [string, string, Province, number, number, number][] 
 export const EDGES: [string, string][] = [
     ["DON","LDY"],["DON","TYR"],["DON","FER"],["DON","LEI"],
     ["LDY","TYR"],["LDY","ANT"],
-    ["ANT","TYR"],["ANT","ARM"],["ANT","DOW"],
+    ["ANT","ARM"],["ANT","DOW"],
     ["TYR","FER"],["TYR","ARM"],["TYR","MON"],
     ["FER","CAV"],["FER","MON"],["FER","LEI"],
     ["ARM","MON"],["ARM","DOW"],["ARM","LOU"],

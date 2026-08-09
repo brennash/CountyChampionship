@@ -24,7 +24,8 @@ export function Sidebar({ state, onCancel, onChangeDifficulty }: Props) {
       <div className="footer-note">
         Up to three marches per turn. A county can be marched into repeatedly, but once it's been a destination
         it can't march out as a source. Armies grow each turn; overwhelm a defender to seize their county, but
-        the county you marched from is left empty.
+        the county you marched from is left empty. Reinforcing a county you already own only draws what's
+        needed to bring it to 99, leaving the rest at home.
       </div>
     </div>
   );

@@ -10,10 +10,11 @@ export interface DifficultyProfile {
   capitalBonus: number;
 }
 
+// capitalBonus values are scaled up to match engine.ts's 99-power ceiling (was tuned around 0/6/12 on a 30-power ceiling).
 export const DIFFICULTY_PROFILES: Record<Difficulty, DifficultyProfile> = {
   easy: { label: "Easy", mistakeChance: 0.6, passChance: 0.35, capitalBonus: 0 },
-  medium: { label: "Medium", mistakeChance: 0.25, passChance: 0.1, capitalBonus: 6 },
-  hard: { label: "Hard", mistakeChance: 0, passChance: 0, capitalBonus: 12 },
+  medium: { label: "Medium", mistakeChance: 0.25, passChance: 0.1, capitalBonus: 20 },
+  hard: { label: "Hard", mistakeChance: 0, passChance: 0, capitalBonus: 40 },
 };
 
 export const DIFFICULTIES: Difficulty[] = ["easy", "medium", "hard"];

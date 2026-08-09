@@ -5,13 +5,20 @@ import { DIFFICULTY_PROFILES } from "./difficulty";
 import type { Difficulty } from "./difficulty";
 import type { GameState, LogEntry, ModalInfo, MoveResult, RuntimePlayer } from "./types";
 
-export const MAX_STACK = 30;
+export const MAX_STACK = 99;
 export const MAX_TURNS = 220;
-export const START_ARMY = 10;
+// Every power figure below (starting armies, per-turn gains, AI scoring weights) is tuned
+// against a 30-power ceiling and scaled up by this ratio to match the new 99-power cap.
+const POWER_SCALE = MAX_STACK / 30;
+export const START_ARMY = Math.round(10 * POWER_SCALE);
 export const MAX_MOVES_PER_TURN = 3;
 
 function rand(a: number, b: number): number {
   return a + Math.floor(Math.random() * (b - a + 1));
+}
+
+function scalePower(n: number): number {
+  return Math.round(n * POWER_SCALE);
 }
 
 export function createInitialState(difficulty: Difficulty = "hard", roles?: Record<PlayerId, boolean>): GameState {
@@ -19,7 +26,7 @@ export function createInitialState(difficulty: Difficulty = "hard", roles?: Reco
   const army: Record<string, number> = {};
   ALL_IDS.forEach((id) => {
     owner[id] = "neutral";
-    army[id] = COUNTIES[id].pop + rand(1, 3);
+    army[id] = scalePower(COUNTIES[id].pop + rand(1, 3));
   });
   PLAYERS.forEach((p) => {
     owner[p.capital] = p.id;
@@ -99,15 +106,23 @@ export function executeMove(state: GameState, fromId: string, toId: string, pid:
   const movingArmy = state.army[fromId];
   if (movingArmy < 1) return { ok: false };
   const toOwner = state.owner[toId];
-  state.army[fromId] = 0;
   const mover = getPlayer(state, pid)!;
 
   if (toOwner === pid) {
-    state.army[toId] = Math.min(MAX_STACK, state.army[toId] + movingArmy);
-    pushLog(state, `${mover.name} reinforces ${COUNTIES[toId].name} with ${movingArmy} (now ${state.army[toId]}).`);
+    // Only draw what's needed to bring the destination to the cap — the rest stays home.
+    const needed = Math.max(0, MAX_STACK - state.army[toId]);
+    const sent = Math.min(movingArmy, needed);
+    state.army[toId] += sent;
+    state.army[fromId] = movingArmy - sent;
+    if (sent > 0) {
+      pushLog(state, `${mover.name} reinforces ${COUNTIES[toId].name} with ${sent} (now ${state.army[toId]}).`);
+    } else {
+      pushLog(state, `${mover.name}'s ${COUNTIES[toId].name} is already at full strength (${MAX_STACK}).`);
+    }
     return { ok: true, type: "reinforce" };
   }
 
+  state.army[fromId] = 0;
   const defense = state.army[toId];
   if (movingArmy > defense) {
     const leftover = movingArmy - defense;
@@ -162,14 +177,15 @@ function planAiMove(state: GameState, p: RuntimePlayer): CandidateMove | null {
       let score: number;
       if (targetOwner === p.id) {
         const front = isFrontline(state, nid, p.id);
-        score = front ? 4 + state.army[nid] * 0.08 : -5;
+        // state.army[nid] is already power-scaled, so this term inherits the scale-up on its own.
+        score = front ? scalePower(4) + state.army[nid] * 0.08 : scalePower(-5);
       } else {
         const defense = state.army[nid];
         if (from > defense) {
-          score = 32 - (from - defense) + (targetOwner === "neutral" ? 2 : 0);
+          score = scalePower(32) - (from - defense) + (targetOwner === "neutral" ? scalePower(2) : 0);
           if (targetOwner !== "neutral" && capitals.has(nid)) score += profile.capitalBonus;
         } else {
-          score = -200;
+          score = scalePower(-200);
         }
       }
       if (score > -1) candidates.push({ from: id, to: nid, score });
@@ -233,7 +249,7 @@ export function applyReinforcements(state: GameState): void {
   ALL_IDS.forEach((id) => {
     const pid = state.owner[id];
     if (pid === "neutral") return;
-    const gain = 1 + Math.floor(COUNTIES[id].pop / 2);
+    const gain = scalePower(1 + Math.floor(COUNTIES[id].pop / 2));
     state.army[id] = Math.min(MAX_STACK, state.army[id] + gain);
   });
 }
