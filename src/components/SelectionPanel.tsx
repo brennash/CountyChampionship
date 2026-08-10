@@ -23,9 +23,11 @@ export function SelectionPanel({ state, onCancel }: Props) {
     );
   } else if (state.selected) {
     const c = COUNTIES[state.selected];
+    const manpower = state.manpower[state.selected];
+    const morale = state.morale[state.selected];
     body = (
       <>
-        <b>{c.name}</b> selected — {state.army[state.selected]} troops.
+        <b>{c.name}</b> selected — {manpower} manpower, {morale} morale (power {manpower + morale}).
         <span className="hint">Click a highlighted neighbour to march. Click again to deselect.</span>
       </>
     );

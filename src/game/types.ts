@@ -29,7 +29,8 @@ export interface GameState {
   turn: number;
   difficulty: Difficulty;
   owner: Record<string, OwnerId>;
-  army: Record<string, number>;
+  manpower: Record<string, number>;
+  morale: Record<string, number>;
   players: RuntimePlayer[];
   /** Index into `players` of whoever's phase it currently is — human or AI. */
   currentPlayerIndex: number;

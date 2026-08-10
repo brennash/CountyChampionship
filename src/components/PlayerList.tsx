@@ -1,5 +1,5 @@
 import { COLOR_HEX } from "../data/players";
-import { armyTotal, countyCount } from "../game/engine";
+import { averageMorale, countyCount, manpowerTotal } from "../game/engine";
 import type { GameState } from "../game/types";
 
 export function PlayerList({ state }: { state: GameState }) {
@@ -25,7 +25,7 @@ export function PlayerList({ state }: { state: GameState }) {
                 <span className="tag">{p.eliminated ? "Eliminated" : p.isHuman ? "Human" : "AI"}</span>
               </div>
               <div className="player-stats">
-                {countyCount(state, p.id)} counties &middot; {armyTotal(state, p.id)} troops
+                {countyCount(state, p.id)} counties &middot; {manpowerTotal(state, p.id)} manpower &middot; {averageMorale(state, p.id)} avg morale
               </div>
             </div>
           </div>

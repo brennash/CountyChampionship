@@ -236,6 +236,14 @@
     pointer-events:none;
     text-shadow:0 0 2px rgba(255,255,255,0.35);
   }
+  .county .morale{
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size:13px;
+    font-weight:700;
+    text-anchor:middle;
+    pointer-events:none;
+    text-shadow:0 0 2px rgba(255,255,255,0.5);
+  }
 
   .sidebar{
     width:308px;

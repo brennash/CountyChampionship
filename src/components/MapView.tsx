@@ -34,6 +34,9 @@ export function MapView({ state, onSelect }: Props) {
           }
           if (state.blinkingCounty === id) classes.push("ai-blink");
 
+          const morale = state.morale[id];
+          const moraleColor = morale >= 66 ? "#3f8f5f" : morale >= 33 ? "#d9b23c" : "#c0392b";
+
           return (
             <g key={id} className={classes.join(" ")} onClick={() => onSelect(id)}>
               <path d={shape.d} fill={COLOR_HEX[ownerId]} />
@@ -41,8 +44,13 @@ export function MapView({ state, onSelect }: Props) {
                 {c.id}
               </text>
               <text className="army" x={c.x} y={c.y + 27}>
-                {state.army[id]}
+                {state.manpower[id]}
               </text>
+              {ownerId !== "neutral" && (
+                <text className="morale" x={c.x} y={c.y + 43} fill={moraleColor}>
+                  {morale}
+                </text>
+              )}
             </g>
           );
         })}

@@ -17,7 +17,8 @@ function cloneState(state: GameState): GameState {
   return {
     ...state,
     owner: { ...state.owner },
-    army: { ...state.army },
+    manpower: { ...state.manpower },
+    morale: { ...state.morale },
     players: state.players.map((p) => ({ ...p })),
     usedSources: new Set(state.usedSources),
     usedDestinations: new Set(state.usedDestinations),
